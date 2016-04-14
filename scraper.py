@@ -164,6 +164,7 @@ def get_sightings(url):
             #  row[0] = date, row[1] = city, row[2] = state, row[3] = shape, row[4] = duration, row[5] = description, row[6] = nope
             row.pop()
             row[1] = row[1].split('(')[0].split('/')[0].rstrip(' ').replace('"', '').replace('\'', '').replace('-', ' ').replace('.', '').upper().encode('ascii', 'ignore')
+            #  Most common city naming problems
             if row[1].startswith('ST '):
                 row[1] = 'SAINT ' + row[1].lstrip('ST ')
             elif row[1] in ('NEW YORK CITY', 'NYC'):
@@ -172,8 +173,6 @@ def get_sightings(url):
                 row[1] = 'WASHINGTON'
 
             row[2] = row[2].split('(')[0].rstrip(' ').replace('"', '').replace('\'', '').replace('.', '').upper().encode('ascii', 'ignore')
-            if row[2] not in STATES:
-                break
 
             row[3] = row[3].split('(')[0].rstrip(' ').replace('"', '').replace('\'', '').replace('.', '').capitalize().encode('ascii', 'ignore')
             if row[3] not in SHAPES:
@@ -288,6 +287,12 @@ def create_db(dbname, username, password):
             cursor.copy_expert(sql="COPY cities FROM stdin DELIMITER ',' CSV;", file=f)
     conn.commit()
     conn.close()
+    conn = get_new_connection(dbname, username, password)
+    with conn.cursor() as cursor:
+        cursor.execute("ALTER TABLE sightings ADD CONSTRAINT fk_city FOREIGN KEY (city_id) REFERENCES cities ON DELETE CASCADE;")
+        cursor.execute("ALTER TABLE counties ADD CONSTRAINT fk_state FOREIGN KEY (state_id) REFERENCES states ON DELETE CASCADE;")
+        cursor.execute("ALTER TABLE cities ADD CONSTRAINT fk_state FOREIGN KEY (state_id) REFERENCES states ON DELETE CASCADE;")
+        cursor.execute("ALTER TABLE cities ADD CONSTRAINT fk_county FOREIGN KEY (county_id) REFERENCES counties ON DELETE CASCADE;")
 
 ###  -- build unique cities, counties, and states from places.csv
 # CREATE TABLE places (city VARCHAR(1024), state VARCHAR(256), county VARCHAR(256), lat REAL, lon REAL);
