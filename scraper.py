@@ -62,14 +62,26 @@ def update_database(dbname, username, password, start_date, end_date):
     print 'Updating sighings from temp_sightings'
     conn = get_new_connection(dbname, username, password)
     with conn.cursor() as cursor:
-        # TODO: Delete duplicates
         cursor.execute("UPDATE temp_sightings SET state_id = (SELECT id FROM states WHERE states.code = temp_sightings.state);")
         cursor.execute("UPDATE temp_sightings SET city_id = (SELECT city_id FROM places WHERE places.city = temp_sightings.city and places.state_id = temp_sightings.state_id);")
         cursor.execute("UPDATE temp_sightings SET county_id = (SELECT county_id FROM places WHERE places.city_id = temp_sightings.city_id);")
-        cursor.execute("INSERT into sightings (created, shape, duration, description, city_id, state_id, county_id) SELECT created, shape, duration, description, city_id, state_id, county_id FROM temp_sightings WHERE city_id is not null and county_id is not null and state_id is not null;")
+        cursor.execute("DELETE FROM temp_sightings WHERE city_id IS NULL OR county_id IS NULL OR state_id IS NULL;")
+        cursor.execute("INSERT into sightings (created, shape, duration, description, city_id, state_id, county_id) SELECT created, shape, duration, description, city_id, state_id, county_id FROM temp_sightings;")
         # TODO: Guess closes match city
-        # cursor.execute("DROP TABLE temp_sightings;")
-        # cursor.execute("DROP TABLE places;")
+        cursor.execute("DROP TABLE temp_sightings;")
+        cursor.execute("DROP TABLE places;")
+    conn.close()
+
+    print 'Deleting duplicates'
+    conn = get_new_connection(dbname, username, password)
+    with conn.cursor() as cursor:
+        # Delete duplicate sightings
+        # select count(*) from (SELECT created, shape, duration, description, city_id, state_id, county_id from sightings GROUP BY created, shape, duration, description, city_id, state_id, county_id HAVING count(*) > 1) a;
+        cursor.execute("CREATE TABLE dup_sightings (id INT, created TIMESTAMP, shape VARCHAR(256), duration int, description VARCHAR(2048), city_id INT, state_id INT, county_id INT);")
+        cursor.execute("WITH duples AS (SELECT created, shape, duration, description, city_id, state_id, county_id from sightings GROUP BY created, shape, duration, description, city_id, state_id, county_id HAVING count(*) > 1) INSERT INTO dup_sightings (id, created, shape, duration, description, city_id, state_id, county_id) SELECT s.id, s.created, s.shape, s.duration, s.description, s.city_id, s.state_id, s.county_id FROM sightings s JOIN duples d ON s.created = d.created AND s.shape = d.shape AND s.duration = d.duration AND s.description = d.description AND s.city_id = d.city_id AND s.state_id = d.state_id AND s.county_id = d.county_id;")
+        cursor.execute("DELETE FROM sightings WHERE id in (select id from dup_sightings);")
+        cursor.execute("INSERT INTO sightings (created, shape, duration, description, city_id, state_id, county_id) SELECT created, shape, duration, description, city_id, state_id, county_id FROM dup_sightings GROUP BY created, shape, duration, description, city_id, state_id, county_id;")
+        cursor.execute("DROP TABLE dup_sightings;")
     conn.close()
 
 
