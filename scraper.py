@@ -11,23 +11,25 @@ DATE_URL = "ndxevent.html"
 #get_content = urlopen(BASE_URL).read()
 #parse_content = BeautifulSoup(main_stuff, "html5lib")
 
+STATES = {'AK': 'ALASKA', 'AL': 'ALABAMA', 'AR': 'ARKANSAS', 'AZ': 'ARIZONA', 'CA': 'CALIFORNIA', 'CO': 'COLORADO',
+          'CT': 'CONNECTICUT', 'DC': 'DISTRICT OF COLUMBIA', 'DE': 'DELAWARE', 'FL': 'FLORIDA', 'GA': 'GEORGIA',
+          'HI': 'HAWAII', 'IA': 'IOWA', 'ID': 'IDAHO', 'IL': 'ILLINOIS', 'IN': 'INDIANA', 'KS': 'KANSAS', 'KY': 'KENTUCKY',
+          'LA': 'LOUISIANA', 'MA': 'MASSACHUSETTS', 'MD': 'MARYLAND', 'ME': 'MAINE', 'MI': 'MICHIGAN', 'MN': 'MINNESOTA',
+          'MO': 'MISSOURI', 'MS': 'MISSISSIPPI', 'MT': 'MONTANA', 'NC': 'NORTH CAROLINA', 'ND': 'NORTH DAKOTA', 'NE': 'NEBRASKA',
+          'NH': 'NEW HAMPSHIRE', 'NJ': 'NEW JERSEY', 'NM': 'NEW MEXICO', 'NV': 'NEVADA', 'NY': 'NEW YORK', 'OH': 'OHIO',
+          'OK': 'OKLAHOMA', 'OR': 'OREGON', 'PA': 'PENNSYLVANIA', 'RI': 'RHODE ISLAND', 'SC': 'SOUTH CAROLINA',
+          'SD': 'SOUTH DAKOTA', 'TN': 'TENNESSEE', 'TX': 'TEXAS', 'UT': 'UTAH', 'VA': 'VIRGINIA', 'VT': 'VERMONT',
+          'WA': 'WASHINGTON', 'WI': 'WISCONSIN', 'WV': 'WEST VIRGINIA', 'WY': 'WYOMING'}
 
-STATES = ['AK', 'AL', 'AR', 'AZ', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MI', 'MN', 'MO', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'VT', 'WA', 'WI', 'WV', 'WY']
+SHAPES = ['Changing', 'Chevron', 'Cigar', 'Circle', 'Cone', 'Cross', 'Cylinder', 'Diamond', 'Disk', 'Egg', 'Fireball', 'Flash',
+          'Formation', 'Light', 'Other', 'Oval', 'Rectangle', 'Sphere', 'Teardrop', 'Triangle']
 
-STATES_FULL = [u'ALASKA', u'ALABAMA', u'ARKANSAS', u'ARIZONA', u'CALIFORNIA', u'COLORADO', u'CONNECTICUT', u'DELAWARE', u'FLORIDA',
-               u'GEORGIA', u'HAWAII', u'IOWA', u'IDAHO', u'ILLINOIS', u'INDIANA', u'KANSAS', u'KENTUCKY', u'LOUISIANA', u'MASSACHUSETTS',
-               u'MARYLAND', u'MAINE', u'MICHIGAN', u'MINNESOTA', u'MISSOURI', u'MISSISSIPPI', u'MONTANA', u'NORTH CAROLINA', u'NORTH DAKOTA',
-               u'NEBRASKA', u'NEW HAMPSHIRE', u'NEW JERSEY', u'NEW MEXICO', u'NEVADA', u'NEW YORK', u'OHIO', u'OKLAHOMA', u'OREGON',
-               u'PENNSYLVANIA', u'RHODE ISLAND', u'SOUTH CAROLINA', u'SOUTH DAKOTA', u'TENNESSEE', u'TEXAS', u'UTAH', u'VIRGINIA',
-               u'VERMONT', u'WASHINGTON', u'WISCONSIN', u'WEST VIRGINIA', u'WYOMING']
+NUMBER_WORDS = {'one': 1, 'two': 2,  'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9,
+                'ten': 10, 'eleven': 11,'twelve': 12, 'thirteen': 13, 'fourteen': 14,'fifteen': 15, 'sixteen': 16,
+                'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty':  20, 'thirty': 30, 'forty': 40, 'fifty': 50,
+                'sixty': 60, 'seventy': 70, 'eighty': 80, 'ninety': 90}
 
-HEADERS = ['created', 'city', 'state', 'shape', 'duration', 'description']
-
-SHAPES = ['Changing', 'Chevron', 'Cigar', 'Circle', 'Cone', 'Cross', 'Cylinder', 'Diamond', 'Disk', 'Egg', 'Fireball', 'Flash', 'Formation', 'Light', 'Other', 'Oval', 'Rectangle', 'Sphere', 'Teardrop', 'Triangle']
-
-NUMBER_WORDS = {'one':   1, 'two':   2,  'three': 3, 'four':  4, 'five':  5, 'six':   6, 'seven': 7, 'eight': 8, 'nine':  9, 'ten': 10, 'eleven': 11,'twelve': 12, 'thirteen': 13, 'fourteen': 14,'fifteen': 15, 'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty':  20, 'thirty':  30, 'forty':   40, 'fifty':   50, 'sixty':   60, 'seventy': 70, 'eighty':  80, 'ninety':  90}
-
-TEMP_SIGHTINGS_SQL = "CREATE TABLE temp_sightings (created TIMESTAMP, city VARCHAR(1024), state VARCHAR(24), shape VARCHAR(1024), duration int, description VARCHAR(2048), city_id INT, county_id INT, state_id INT);"
+TEMP_SIGHTINGS_SQL = "CREATE TABLE temp_sightings (created_date TIMESTAMP, city VARCHAR(1024), state VARCHAR(24), shape VARCHAR(1024), duration int, description VARCHAR(2048), city_id INT, county_id INT, state_id INT);"
 
 
 def get_new_connection(dbname, username, password):
@@ -47,7 +49,7 @@ def update_database(dbname, username, password, start_date, end_date):
         cursor.execute("{}".format(TEMP_SIGHTINGS_SQL))
     conn.close()
 
-    insert_sql = "INSERT INTO temp_sightings (created, city, state, shape, duration, description) values ('{created}', '{city}', '{state}', '{shape}', '{dur}', '{desc}');"
+    insert_sql = "INSERT INTO temp_sightings (created_date, city, state, shape, duration, description) values ('{created}', '{city}', '{state}', '{shape}', '{dur}', '{desc}');"
     urls = get_urls_by_date(start_date, end_date)
     for url in urls:
         sightings = get_sightings(url)
@@ -66,22 +68,23 @@ def update_database(dbname, username, password, start_date, end_date):
         cursor.execute("UPDATE temp_sightings SET city_id = (SELECT city_id FROM places WHERE places.city = temp_sightings.city and places.state_id = temp_sightings.state_id);")
         cursor.execute("UPDATE temp_sightings SET county_id = (SELECT county_id FROM places WHERE places.city_id = temp_sightings.city_id);")
         cursor.execute("DELETE FROM temp_sightings WHERE city_id IS NULL OR county_id IS NULL OR state_id IS NULL;")
-        cursor.execute("INSERT into sightings (created, shape, duration, description, city_id, state_id, county_id) SELECT created, shape, duration, description, city_id, state_id, county_id FROM temp_sightings;")
+        cursor.execute("INSERT into sightings (created_date, shape, duration, description, city_id, state_id, county_id) SELECT created_date, shape, duration, description, city_id, state_id, county_id FROM temp_sightings;")
         # TODO: Guess closes match city
-        cursor.execute("DROP TABLE temp_sightings;")
-        cursor.execute("DROP TABLE places;")
     conn.close()
 
-    print 'Deleting duplicates'
+    print 'Cleaning stuff...'
     conn = get_new_connection(dbname, username, password)
     with conn.cursor() as cursor:
         # Delete duplicate sightings
-        # select count(*) from (SELECT created, shape, duration, description, city_id, state_id, county_id from sightings GROUP BY created, shape, duration, description, city_id, state_id, county_id HAVING count(*) > 1) a;
-        cursor.execute("CREATE TABLE dup_sightings (id INT, created TIMESTAMP, shape VARCHAR(256), duration int, description VARCHAR(2048), city_id INT, state_id INT, county_id INT);")
-        cursor.execute("WITH duples AS (SELECT created, shape, duration, description, city_id, state_id, county_id from sightings GROUP BY created, shape, duration, description, city_id, state_id, county_id HAVING count(*) > 1) INSERT INTO dup_sightings (id, created, shape, duration, description, city_id, state_id, county_id) SELECT s.id, s.created, s.shape, s.duration, s.description, s.city_id, s.state_id, s.county_id FROM sightings s JOIN duples d ON s.created = d.created AND s.shape = d.shape AND s.duration = d.duration AND s.description = d.description AND s.city_id = d.city_id AND s.state_id = d.state_id AND s.county_id = d.county_id;")
+        # select count(*) from (SELECT created_date, shape, duration, description, city_id, state_id, county_id from sightings GROUP BY created_date, shape, duration, description, city_id, state_id, county_id HAVING count(*) > 1) a;
+        cursor.execute("DELETE FROM sightings WHERE created_date < '2000/01/01' OR created_date > '2017/01/01';")
+        cursor.execute("CREATE TABLE dup_sightings (id INT, created_date TIMESTAMP, shape VARCHAR(256), duration int, description VARCHAR(2048), city_id INT, state_id INT, county_id INT);")
+        cursor.execute("WITH duples AS (SELECT created_date, shape, duration, description, city_id, state_id, county_id from sightings GROUP BY created_date, shape, duration, description, city_id, state_id, county_id HAVING count(*) > 1) INSERT INTO dup_sightings (id, created_date, shape, duration, description, city_id, state_id, county_id) SELECT s.id, s.created_date, s.shape, s.duration, s.description, s.city_id, s.state_id, s.county_id FROM sightings s JOIN duples d ON s.created_date = d.created_date AND s.shape = d.shape AND s.duration = d.duration AND s.description = d.description AND s.city_id = d.city_id AND s.state_id = d.state_id AND s.county_id = d.county_id;")
         cursor.execute("DELETE FROM sightings WHERE id in (select id from dup_sightings);")
-        cursor.execute("INSERT INTO sightings (created, shape, duration, description, city_id, state_id, county_id) SELECT created, shape, duration, description, city_id, state_id, county_id FROM dup_sightings GROUP BY created, shape, duration, description, city_id, state_id, county_id;")
+        cursor.execute("INSERT INTO sightings (created_date, shape, duration, description, city_id, state_id, county_id) SELECT created_date, shape, duration, description, city_id, state_id, county_id FROM dup_sightings GROUP BY created_date, shape, duration, description, city_id, state_id, county_id;")
         cursor.execute("DROP TABLE dup_sightings;")
+        cursor.execute("DROP TABLE temp_sightings;")
+        cursor.execute("DROP TABLE places;")
     conn.close()
 
 
@@ -202,6 +205,8 @@ def get_sightings(url):
     return sightings
 
 
+# create_or_append_sightings_db("a5", "a", "b", "01/2000", "03/2000", append=False)
+# create_or_append_sightings_db("a5", "a", "b", "01/2000", "03/2000", append=True)
 def create_or_append_sightings_db(dbname, username, password, start_date=None, end_date=None, append=True, create_only=False):
     if start_date:
         try:
@@ -210,7 +215,7 @@ def create_or_append_sightings_db(dbname, username, password, start_date=None, e
             print 'Invalid start_date: %s' % start_date
             return
     else:
-        start_date = datetime.datetime.strptime('01/1950', "%m/%Y")
+        start_date = datetime.datetime.strptime('01/2000', "%m/%Y")
 
     if end_date:
         try:
@@ -267,7 +272,7 @@ def create_or_append_sightings_db(dbname, username, password, start_date=None, e
 def create_db(dbname, username, password):
     conn = get_new_connection(dbname, username, password)
     with conn.cursor() as cursor:
-        cursor.execute("CREATE TABLE sightings (id serial PRIMARY KEY, created TIMESTAMP, shape VARCHAR(256), duration int, description VARCHAR(2048), city_id INT, state_id INT, county_id INT);")
+        cursor.execute("CREATE TABLE sightings (id serial PRIMARY KEY, created_date TIMESTAMP, shape VARCHAR(256), duration int, description VARCHAR(2048), city_id INT, state_id INT, county_id INT);")
         cursor.execute("CREATE TABLE states (id serial PRIMARY KEY, code VARCHAR(2), name VARCHAR(64), lat REAL, lon REAL);")
         with open('states.csv', 'r') as f:
             cursor.copy_expert(sql="COPY states FROM stdin DELIMITER ',' CSV;", file=f)
@@ -288,15 +293,28 @@ def create_db(dbname, username, password):
     conn.commit()
     conn.close()
     conn = get_new_connection(dbname, username, password)
+    update_state_names(conn)
+    conn = get_new_connection(dbname, username, password)
     with conn.cursor() as cursor:
         cursor.execute("ALTER TABLE sightings ADD CONSTRAINT fk_city FOREIGN KEY (city_id) REFERENCES cities ON DELETE CASCADE;")
         cursor.execute("ALTER TABLE counties ADD CONSTRAINT fk_state FOREIGN KEY (state_id) REFERENCES states ON DELETE CASCADE;")
         cursor.execute("ALTER TABLE cities ADD CONSTRAINT fk_state FOREIGN KEY (state_id) REFERENCES states ON DELETE CASCADE;")
         cursor.execute("ALTER TABLE cities ADD CONSTRAINT fk_county FOREIGN KEY (county_id) REFERENCES counties ON DELETE CASCADE;")
 
+
+def update_state_names(conn):
+    update_sql = "UPDATE states SET name = '{name}' WHERE code = '{code}';"
+    with conn.cursor() as cursor:
+        for k, v in STATES.iteritems():
+            cursor.execute(update_sql.format(name=v, code=k))
+    conn.commit()
+
+
 ###  -- build unique cities, counties, and states from places.csv
 # CREATE TABLE places (city VARCHAR(1024), state VARCHAR(256), county VARCHAR(256), lat REAL, lon REAL);
+# CREATE TABLE state_loc (code VARCHAR(2), lat REAL, lon REAL);
 # COPY places FROM '/Users/ben/chartio/datasets/ufo/scrapes/places.csv' DELIMITER ',' CSV;
+# COPY state_loc FROM '/Users/ben/chartio/datasets/ufo/scrapes/state_loc.csv' DELIMITER ',' CSV;
 
 # DELETE FROM places WHERE county is null;
 # DELETE FROM places WHERE city is null;
@@ -312,8 +330,11 @@ def create_db(dbname, username, password):
 # INSERT into cities (name, county_id, state_id, lat, lon) SELECT city, county_id, state_id, avg(lat), avg(lon) FROM places GROUP BY city, county_id, state_id;
 # UPDATE counties SET lat = (SELECT avg(lat) FROM places WHERE county_id = counties.id GROUP BY county_id);
 # UPDATE counties SET lon = (SELECT avg(lon) FROM places WHERE county_id = counties.id GROUP BY county_id);
-# UPDATE states SET lon = (SELECT avg(lon) FROM places WHERE state_id = states.id GROUP BY state_id);
-# UPDATE states SET lat = (SELECT avg(lat) FROM places WHERE state_id = state_id);
+# UPDATE cities SET lat = (select lat from counties where counties.id = cities.county_id) WHERE lat is null;
+# UPDATE cities SET lon = (select lon from counties where counties.id = cities.county_id) WHERE lon is null;
+# UPDATE states SET lat = (select lat from state_loc where states.code = state_loc.code);
+# UPDATE states SET lon = (select lon from state_loc where states.code = state_loc.code);
+
 
 ###  -- dedupe cities
 # CREATE TABLE doubles (id int, name VARCHAR(1024), state_id INT, county_id INT, county_name varchar(256), lat REAL, lon REAL);
@@ -336,6 +357,7 @@ def create_db(dbname, username, password):
 # DROP TABLE city_counties;
 # DROP TABLE doubles;
 # DROP TABLE places;
+# DROP TABLE state_loc;
 ###  -- export
 # COPY cities TO '/Users/ben/chartio/datasets/ufo/scrapes/cities.csv' DELIMITER',' CSV;
 # COPY states TO '/Users/ben/chartio/datasets/ufo/scrapes/states.csv' DELIMITER ',' CSV;
