@@ -4,12 +4,10 @@ import psycopg2
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 
+
 BASE_URL = "http://www.nuforc.org/webreports/"
-LOC_URL = "ndxloc.html"
 DATE_URL = "ndxevent.html"
 
-#get_content = urlopen(BASE_URL).read()
-#parse_content = BeautifulSoup(main_stuff, "html5lib")
 
 STATES = {'AK': 'ALASKA', 'AL': 'ALABAMA', 'AR': 'ARKANSAS', 'AZ': 'ARIZONA', 'CA': 'CALIFORNIA', 'CO': 'COLORADO',
           'CT': 'CONNECTICUT', 'DC': 'DISTRICT OF COLUMBIA', 'DE': 'DELAWARE', 'FL': 'FLORIDA', 'GA': 'GEORGIA',
@@ -31,6 +29,9 @@ NUMBER_WORDS = {'one': 1, 'two': 2,  'three': 3, 'four': 4, 'five': 5, 'six': 6,
 
 TEMP_SIGHTINGS_SQL = "CREATE TABLE temp_sightings (created_date TIMESTAMP, city VARCHAR(1024), state VARCHAR(24), shape VARCHAR(1024), duration int, description VARCHAR(2048), city_id INT, county_id INT, state_id INT);"
 
+MIN_DATE = datetime.datetime(2000, 1, 1)
+MAX_DATE = datetime.datetime.utcnow()
+
 
 def get_new_connection(dbname, username, password):
     #return psycopg2.connect("dbname={db} user={user} password={pwd}".format(db=dbname, user=username, pwd=password))
@@ -39,67 +40,48 @@ def get_new_connection(dbname, username, password):
     return conn
 
 
-def update_database(dbname, username, password, start_date, end_date):
+def update_database(conn, start_date, end_date):
 
-    conn = get_new_connection(dbname, username, password)
     with conn.cursor() as cursor:
         cursor.execute("CREATE TABLE places (city VARCHAR(1024), state VARCHAR(256), state_id INT, county_id INT, city_id INT);")
         cursor.execute("INSERT into places (city, state_id, county_id, city_id) SELECT name, state_id, county_id, id FROM cities;")
         cursor.execute("UPDATE places SET state = (SELECT states.code FROM states WHERE states.id = places.state_id);")
         cursor.execute("{}".format(TEMP_SIGHTINGS_SQL))
-    conn.close()
 
     insert_sql = "INSERT INTO temp_sightings (created_date, city, state, shape, duration, description) values ('{created}', '{city}', '{state}', '{shape}', '{dur}', '{desc}');"
     urls = get_urls_by_date(start_date, end_date)
     for url in urls:
         sightings = get_sightings(url)
         print 'Inserting to temp_sightings %s' % url
-        conn = get_new_connection(dbname, username, password)
         with conn.cursor() as cursor:
             for s in sightings:
                 cursor.execute(insert_sql.format(created=s[0], city=s[1], state=s[2], shape=s[3], dur=s[4], desc=s[5]))
-        conn.commit()
-        conn.close()
 
     print 'Updating sighings from temp_sightings'
-    conn = get_new_connection(dbname, username, password)
     with conn.cursor() as cursor:
         cursor.execute("UPDATE temp_sightings SET state_id = (SELECT id FROM states WHERE states.code = temp_sightings.state);")
         cursor.execute("UPDATE temp_sightings SET city_id = (SELECT city_id FROM places WHERE places.city = temp_sightings.city and places.state_id = temp_sightings.state_id);")
         cursor.execute("UPDATE temp_sightings SET county_id = (SELECT county_id FROM places WHERE places.city_id = temp_sightings.city_id);")
         cursor.execute("DELETE FROM temp_sightings WHERE city_id IS NULL OR county_id IS NULL OR state_id IS NULL;")
         cursor.execute("INSERT into sightings (created_date, shape, duration, description, city_id, state_id, county_id) SELECT created_date, shape, duration, description, city_id, state_id, county_id FROM temp_sightings;")
-        # TODO: Guess closes match city
-    conn.close()
-
-    print 'Cleaning stuff...'
-    conn = get_new_connection(dbname, username, password)
-    with conn.cursor() as cursor:
-        # Delete duplicate sightings
-        # select count(*) from (SELECT created_date, shape, duration, description, city_id, state_id, county_id from sightings GROUP BY created_date, shape, duration, description, city_id, state_id, county_id HAVING count(*) > 1) a;
-        cursor.execute("DELETE FROM sightings WHERE created_date < '2000/01/01' OR created_date > '2017/01/01';")
+        cursor.execute("DELETE FROM sightings WHERE created_date < '{mindate}' OR created_date > '{maxdate}';".format(mindate=datetime.datetime.strftime(MIN_DATE, "%Y/%m/%d"), maxdate=datetime.datetime.strftime(MAX_DATE, "%Y/%m/%d")))
         cursor.execute("CREATE TABLE dup_sightings (id INT, created_date TIMESTAMP, shape VARCHAR(256), duration int, description VARCHAR(2048), city_id INT, state_id INT, county_id INT);")
         cursor.execute("WITH duples AS (SELECT created_date, shape, duration, description, city_id, state_id, county_id from sightings GROUP BY created_date, shape, duration, description, city_id, state_id, county_id HAVING count(*) > 1) INSERT INTO dup_sightings (id, created_date, shape, duration, description, city_id, state_id, county_id) SELECT s.id, s.created_date, s.shape, s.duration, s.description, s.city_id, s.state_id, s.county_id FROM sightings s JOIN duples d ON s.created_date = d.created_date AND s.shape = d.shape AND s.duration = d.duration AND s.description = d.description AND s.city_id = d.city_id AND s.state_id = d.state_id AND s.county_id = d.county_id;")
         cursor.execute("DELETE FROM sightings WHERE id in (select id from dup_sightings);")
         cursor.execute("INSERT INTO sightings (created_date, shape, duration, description, city_id, state_id, county_id) SELECT created_date, shape, duration, description, city_id, state_id, county_id FROM dup_sightings GROUP BY created_date, shape, duration, description, city_id, state_id, county_id;")
-        cursor.execute("DROP TABLE dup_sightings;")
-        cursor.execute("DROP TABLE temp_sightings;")
-        cursor.execute("DROP TABLE places;")
-    conn.close()
 
 
 def delete_temp_tables(conn):
     try:
         with conn.cursor() as cursor:
-            cursor.execute("drop table temp_sightings;")
-            cursor.execute("drop table places;")
-        conn.commit()
-        conn.close()
+            cursor.execute("DROP TABLE IF EXISTS temp_sightings;")
+            cursor.execute("DROP TABLE IF EXISTS places;")
+            cursor.execute("DROP TABLE IF EXISTS dup_sightings;")
     except psycopg2.ProgrammingError as e:
         print e
 
 
-def get_urls_by_date(start_date, end_date):  # Send a start_date as "MM/YYYY" or none to get all dates
+def get_urls_by_date(start_date, end_date):
     index_url = BASE_URL + DATE_URL
     anchors = BeautifulSoup(urlopen(index_url).read(), "html5lib").find('table').find_all('a', href=True)
     urls = []
@@ -164,8 +146,7 @@ def get_sightings(url):
         for td in tr.find_all('td'):
             row.append(td.text)
         try:
-            #  row[0] = date, row[1] = city, row[2] = state, row[3] = shape, row[4] = duration, row[5] = description, row[6] = nope
-            row.pop()
+            #  City
             row[1] = row[1].split('(')[0].split('/')[0].rstrip(' ').replace('"', '').replace('\'', '').replace('-', ' ').replace('.', '').upper().encode('ascii', 'ignore')
             #  Most common city naming problems
             if row[1].startswith('ST '):
@@ -175,13 +156,17 @@ def get_sightings(url):
             elif row[1] in ('WASHINGTON, DC', 'WASHINGTON DC'):
                 row[1] = 'WASHINGTON'
 
+            #  State
             row[2] = row[2].split('(')[0].rstrip(' ').replace('"', '').replace('\'', '').replace('.', '').upper().encode('ascii', 'ignore')
 
+            #  Shape
             row[3] = row[3].split('(')[0].rstrip(' ').replace('"', '').replace('\'', '').replace('.', '').capitalize().encode('ascii', 'ignore')
             if row[3] not in SHAPES:
                 row[3] = 'Other'
-            #  Make duration something usable
+
+            #  Duration
             row[4] = row[4].split('(')[0].rstrip(' ').replace('"', '').replace('\'', '').lower().encode('ascii', 'ignore')
+
             multiple = time_multi(row[4])
             num = first_int(row[4])
             if not num:
@@ -191,10 +176,13 @@ def get_sightings(url):
             else:
                 num = 10
             row[4] = num
+
+            #  Description
             row[5] = row[5].split('(')[0].rstrip(' ').replace('"', '').replace('\'', '').capitalize().encode('ascii', 'ignore')
-            #  Maybe
-            #  row_dict = map(lambda x, y: {x : y}, HEADERS, row)
-            #  sightings.append(row_dict)
+
+            #  Drop the last column
+            row.pop()
+
             sightings.append(row)
         except IndexError:
             print "IndexError with row: %s" % row
@@ -205,34 +193,34 @@ def get_sightings(url):
     return sightings
 
 
-# create_or_append_sightings_db("a5", "a", "b", "01/2000", "03/2000", append=False)
-# create_or_append_sightings_db("a5", "a", "b", "01/2000", "03/2000", append=True)
+# create_or_append_sightings_db("ufos", "user", "pass", "01/2000", "03/2000", append=False, create_only=False)
 def create_or_append_sightings_db(dbname, username, password, start_date=None, end_date=None, append=True, create_only=False):
     if start_date:
         try:
             start_date = datetime.datetime.strptime(start_date, "%m/%Y")
+            start_date = MIN_DATE if start_date < MIN_DATE else start_date
         except ValueError:
             print 'Invalid start_date: %s' % start_date
             return
     else:
-        start_date = datetime.datetime.strptime('01/2000', "%m/%Y")
+        start_date = MIN_DATE
 
     if end_date:
         try:
             end_date = datetime.datetime.strptime(end_date, "%m/%Y")
+            end_date = MAX_DATE if end_date > MAX_DATE else end_date
         except ValueError:
             print 'Invalid start_date: %s' % end_date
             return
     else:
-        end_date = datetime.datetime.utcnow()
+        end_date = MAX_DATE
 
     if append:
         try:
             conn = get_new_connection(dbname, username, password)
             delete_temp_tables(conn)
-            update_database(dbname, username, password, start_date, end_date)
-            #conn = get_new_connection(dbname, username, password)
-            #delete_temp_tables(conn)
+            update_database(conn, start_date, end_date)
+            delete_temp_tables(conn)
         except psycopg2.OperationalError as e:
             print "Cannot connect to database: %s" % dbname
             print "psycopg2 error: %s" % e
@@ -251,63 +239,45 @@ def create_or_append_sightings_db(dbname, username, password, start_date=None, e
                     if confirm.upper() == 'Y':
                         admin_conn.cursor().execute("drop database %s;" % dbname)
             except psycopg2.OperationalError as e:
-                print "This error is probably expected"
+                print "This error is probably expected..."
                 print "psycopg2 error: %s" % e
             print "Creating database..."
             admin_conn.cursor().execute("create database %s;" % dbname)
             admin_conn.close()
-            create_db(dbname, username, password)
+            conn = get_new_connection(dbname, username, password)
+            create_initial_db(conn)
             if not create_only:
-                conn = get_new_connection(dbname, username, password)
                 delete_temp_tables(conn)
-                update_database(dbname, username, password, start_date, end_date)
-                #conn = get_new_connection(dbname, username, password)
-                #delete_temp_tables(conn)
+                update_database(conn, start_date, end_date)
+                delete_temp_tables(conn)
         except psycopg2.OperationalError as e:
             print "Can't create a database without admin rights"
             print "psycopg2 error: %s" % e
             return
 
 
-def create_db(dbname, username, password):
-    conn = get_new_connection(dbname, username, password)
+def create_initial_db(conn):
+    update_state_sql = "UPDATE states SET name = '{name}' WHERE code = '{code}';"
     with conn.cursor() as cursor:
         cursor.execute("CREATE TABLE sightings (id serial PRIMARY KEY, created_date TIMESTAMP, shape VARCHAR(256), duration int, description VARCHAR(2048), city_id INT, state_id INT, county_id INT);")
         cursor.execute("CREATE TABLE states (id serial PRIMARY KEY, code VARCHAR(2), name VARCHAR(64), lat REAL, lon REAL);")
+        cursor.execute("CREATE TABLE counties (id serial PRIMARY KEY, name VARCHAR(256), state_id INT, lat REAL, lon REAL);")
+        cursor.execute("CREATE TABLE cities (id serial PRIMARY KEY, name VARCHAR(1024), state_id INT, county_id INT, lat REAL, lon REAL);")
+
         with open('states.csv', 'r') as f:
             cursor.copy_expert(sql="COPY states FROM stdin DELIMITER ',' CSV;", file=f)
-    conn.commit()
-    conn.close()
-    conn = get_new_connection(dbname, username, password)
-    with conn.cursor() as cursor:
-        cursor.execute("CREATE TABLE counties (id serial PRIMARY KEY, name VARCHAR(256), state_id INT, lat REAL, lon REAL);")
         with open('counties.csv', 'r') as f:
             cursor.copy_expert(sql="COPY counties FROM stdin DELIMITER ',' CSV;", file=f)
-    conn.commit()
-    conn.close()
-    conn = get_new_connection(dbname, username, password)
-    with conn.cursor() as cursor:
-        cursor.execute("CREATE TABLE cities (id serial PRIMARY KEY, name VARCHAR(1024), state_id INT, county_id INT, lat REAL, lon REAL);")
         with open('cities.csv', 'r') as f:
             cursor.copy_expert(sql="COPY cities FROM stdin DELIMITER ',' CSV;", file=f)
-    conn.commit()
-    conn.close()
-    conn = get_new_connection(dbname, username, password)
-    update_state_names(conn)
-    conn = get_new_connection(dbname, username, password)
-    with conn.cursor() as cursor:
+
+        for k, v in STATES.iteritems():
+            cursor.execute(update_state_sql.format(name=v, code=k))
+
         cursor.execute("ALTER TABLE sightings ADD CONSTRAINT fk_city FOREIGN KEY (city_id) REFERENCES cities ON DELETE CASCADE;")
         cursor.execute("ALTER TABLE counties ADD CONSTRAINT fk_state FOREIGN KEY (state_id) REFERENCES states ON DELETE CASCADE;")
         cursor.execute("ALTER TABLE cities ADD CONSTRAINT fk_state FOREIGN KEY (state_id) REFERENCES states ON DELETE CASCADE;")
         cursor.execute("ALTER TABLE cities ADD CONSTRAINT fk_county FOREIGN KEY (county_id) REFERENCES counties ON DELETE CASCADE;")
-
-
-def update_state_names(conn):
-    update_sql = "UPDATE states SET name = '{name}' WHERE code = '{code}';"
-    with conn.cursor() as cursor:
-        for k, v in STATES.iteritems():
-            cursor.execute(update_sql.format(name=v, code=k))
-    conn.commit()
 
 
 ###  -- build unique cities, counties, and states from places.csv
