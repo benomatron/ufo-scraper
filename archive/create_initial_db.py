@@ -86,3 +86,22 @@
 # COPY cities TO '/Users/ben/chartio/datasets/ufo/scrapes/cities.csv' DELIMITER',' CSV;
 # COPY states TO '/Users/ben/chartio/datasets/ufo/scrapes/states.csv' DELIMITER ',' CSV;
 # COPY counties TO '/Users/ben/chartio/datasets/ufo/scrapes/counties.csv' DELIMITER ',' CSV;
+
+# pg_dump ufo_sightings > ufo_sightings.sql
+# gzip ufo_sightings.sql
+# md5 ufo_sightings.sql.gz
+# update salt with hash and upload file to s3
+
+# scp ufo_sightings.sql.gz ben@hostname:/home/user
+
+# gzip -d ufo_sightings.sql.gz
+
+# drop database ufo_sightings;
+# create database ufo_sightings;
+#
+# psql -h hostname_name_name -U username_name ufo_sightings < ufo_sightings.sql
+#
+# GRANT SELECT ON public."cities" TO username_name;
+# GRANT SELECT ON public."counties" TO username_name;
+# GRANT SELECT ON public."sightings" TO username_name;
+# GRANT SELECT ON public."states" TO username_name
