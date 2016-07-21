@@ -1,0 +1,33 @@
+rewriting data without deleting db and needing to reset permissions and all that stuff
+
+pg_dump ufo_sightings > dumpfile.db
+
+-- edit file
+-- delete all table creations
+-- delete all references to id_seq
+-- delete revoke/permissions at the bottom of the file
+
+-- run on database (need to do from stage):
+-- psql -h demo.server.com -U username ufo_sightings
+delete from sightings where id is not null;
+delete from cities where id is not null;
+delete from counties where id is not null;
+delete from states where id is not null;
+
+drop sequence sightings_id_seq cascade;
+drop sequence cities_id_seq cascade;
+drop sequence counties_id_seq cascade;
+drop sequence states_id_seq cascade;
+
+-- run this a couple of times to get the cascades
+ALTER TABLE ONLY cities DROP CONSTRAINT cities_pkey;
+ALTER TABLE ONLY counties DROP CONSTRAINT counties_pkey;
+ALTER TABLE ONLY sightings DROP CONSTRAINT sightings_pkey;
+ALTER TABLE ONLY states DROP CONSTRAINT states_pkey;
+ALTER TABLE ONLY sightings DROP CONSTRAINT fk_city;
+ALTER TABLE ONLY cities DROP CONSTRAINT fk_county;
+ALTER TABLE ONLY counties DROP CONSTRAINT fk_state;
+ALTER TABLE ONLY cities DROP CONSTRAINT fk_state;
+
+-- psql -h demo.server.com -U username ufo_sightings < dumpfile.db
+
